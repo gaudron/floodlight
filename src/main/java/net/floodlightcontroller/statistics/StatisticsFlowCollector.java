@@ -16,6 +16,7 @@ import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.util.MatchUtils;
+import net.floodlightcontroller.flowcreator.FlowCreator;
 
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
@@ -50,7 +51,6 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;
 	private static IRestApiService restApiService;
-	private IFloodlightProviderService floodlightProvider;
 
 	private static boolean isEnabled = false;
 	
@@ -133,7 +133,7 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 				log.warn("*** FlowMonitor: An error occurred while polling switch: " + e);
 			}
 			
-			writeFlowMod(sw1);
+			net.floodlightcontroller.flowcreator.FlowCreator.writeFlowMod(sw1);
 		}
 		
 		private void writeFlowMod(IOFSwitch sw) {
@@ -211,7 +211,6 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 		l.add(IOFSwitchService.class);
 		l.add(IThreadPoolService.class);
 		l.add(IRestApiService.class);
-		l.add(IFloodlightProviderService.class);
 		return l;
 	}
 
@@ -221,7 +220,6 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		restApiService = context.getServiceImpl(IRestApiService.class);
-		floodlightProvider = context.getServiceImpl(IFloodlightProviderService.class);
 
 		Map<String, String> config = context.getConfigParams(this);
 		if (config.containsKey(ENABLED_STR)) {

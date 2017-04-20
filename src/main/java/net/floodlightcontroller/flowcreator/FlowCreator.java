@@ -9,16 +9,23 @@ import java.util.Map;
 
 import org.projectfloodlight.openflow.protocol.OFFactories;
 import org.projectfloodlight.openflow.protocol.OFFactory;
+import org.projectfloodlight.openflow.protocol.OFFlowAdd;
 import org.projectfloodlight.openflow.protocol.OFFlowMod;
 import org.projectfloodlight.openflow.protocol.OFFlowModFlags;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.OFVersion;
 import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.EthType;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.IpProtocol;
 import org.projectfloodlight.openflow.types.OFBufferId;
 import org.projectfloodlight.openflow.types.OFPort;
+import org.projectfloodlight.openflow.types.TableId;
+import org.projectfloodlight.openflow.types.TransportPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +40,7 @@ import net.floodlightcontroller.staticentry.*;
 
 public class FlowCreator implements IFloodlightModule {
 
-	protected static Logger logger;
+	protected static Logger log;
 	private static IOFSwitchService switchService;
 
 	@Override
@@ -58,59 +65,45 @@ public class FlowCreator implements IFloodlightModule {
 
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
-		logger = LoggerFactory.getLogger(FlowCreator.class);
+		log = LoggerFactory.getLogger(FlowCreator.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		//writeFlowMod(switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01")));
+		
 	}
 	
-	/**
-	 * Writes a single OFMessage to a switch
-	 * @param dpid The datapath ID of the switch to write to
-	 * @param message The OFMessage to write.
-	 */
-	private void writeOFMessageToSwitch(DatapathId dpid, OFMessage message) {
-		IOFSwitch sw1 = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-		if (sw1 != null) {  // is the switch connected
-			logger.info("Writing rule to switch");
-			//ofswitch.write(message);
-		}
-		else {
-			logger.info("no switch !");
-		}
-	}
-
-	private void writeFlowMod(IOFSwitch sw) {
+	public static void writeFlowMod(IOFSwitch sw) {
 		OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
-		OFFlowMod flowMod;
-		flowMod = factory.buildFlowModify().build();
-		Match match;
-		match = MatchUtils.fromString("eth_type=0x800,ipv4_dst=10.0.0.2", factory.getVersion());
-		List<OFAction> actions = new LinkedList<OFAction>();
-		actions.add(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
-
-		flowMod = flowMod.createBuilder().setMatch(match)
-				.setActions(actions)
-				.setFlags(Collections.singleton(OFFlowModFlags.SEND_FLOW_REM))
-				.setBufferId(OFBufferId.NO_BUFFER)
-				.setOutPort(OFPort.ANY)
-				.setPriority(Integer.MAX_VALUE)
-				.setXid(4)
-				.build();
 		
-		IOFSwitch sw1 = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-		if (sw1 != null) {
-			sw1.write(flowMod);
+		Match myMatch = factory.buildMatch()
+			    .setExact(MatchField.IN_PORT, OFPort.of(1))
+			    .setExact(MatchField.ETH_TYPE, EthType.IPv4)
+			    .setExact(MatchField.IPV4_SRC, IPv4Address.of("10.0.0.1"))
+			    .setExact(MatchField.IP_PROTO, IpProtocol.TCP)
+			    .setExact(MatchField.TCP_DST, TransportPort.of(80))
+			    .build();
+		
+		
+		OFFlowAdd flowAdd = factory.buildFlowAdd()
+			    .setBufferId(OFBufferId.NO_BUFFER)
+			    .setHardTimeout(3600)
+			    .setIdleTimeout(10)
+			    .setPriority(32768)
+			    .setMatch(myMatch)
+			    .setTableId(TableId.of(1))
+			    .build();
+		
+		sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
+		if (sw != null) {
+			log.info("Writing to switch");
+			sw.write(flowAdd);
 		}
 		else {
-			logger.warn("No switch !");
-		}
-		
-		//writeOFMessageToSwitch(DatapathId.of("00:00:00:00:00:00:00:01"), flowMod);
+			log.warn("No switch connected !");
+		}		
 	}
-
 }
+	
