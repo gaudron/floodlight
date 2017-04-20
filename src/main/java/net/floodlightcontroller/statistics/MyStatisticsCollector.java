@@ -32,8 +32,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class StatisticsCollector2 implements IFloodlightModule {
-	private static final Logger log = LoggerFactory.getLogger(StatisticsCollector2.class);
+public class MyStatisticsCollector implements IFloodlightModule {
+	private static final Logger log = LoggerFactory.getLogger(MyStatisticsCollector.class);
 
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;

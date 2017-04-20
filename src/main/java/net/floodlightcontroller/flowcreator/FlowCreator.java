@@ -96,7 +96,7 @@ public class FlowCreator implements IFloodlightModule {
 			    .setTableId(TableId.of(1))
 			    .build();
 		
-		sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
+		//sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
 		if (sw != null) {
 			log.info("Writing to switch");
 			sw.write(flowAdd);

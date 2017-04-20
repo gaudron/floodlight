@@ -45,6 +45,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+//Without thread, only one switch
+
 public class StatisticsFlowCollector implements IFloodlightModule {
 	private static final Logger log = LoggerFactory.getLogger(StatisticsFlowCollector.class);
 
@@ -136,8 +138,8 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 			net.floodlightcontroller.flowcreator.FlowCreator.writeFlowMod(sw1);
 		}
 		
-		private void writeFlowMod(IOFSwitch sw) {
-			OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
+		//private void writeFlowMod(IOFSwitch sw) {
+			//OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
 			/*OFMessageFactory ofMessageFactory;
 			OFFlowMod flowMod = floodlightProvider.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
 			Match match;
@@ -154,7 +156,7 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 					.setXid(10)
 					.build();*/
 			
-			Match myMatch = factory.buildMatch()
+			/*Match myMatch = factory.buildMatch()
 				    .setExact(MatchField.IN_PORT, OFPort.of(1))
 				    .setExact(MatchField.ETH_TYPE, EthType.IPv4)
 				    .setExact(MatchField.IPV4_SRC, IPv4Address.of("10.0.0.1"))
@@ -182,7 +184,7 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 			}
 			
 			//writeOFMessageToSwitch(DatapathId.of("00:00:00:00:00:00:00:01"), flowMod);
-		}
+		}*/
 	}
 
 
