@@ -20,6 +20,12 @@ package net.floodlightcontroller.core;
 import org.projectfloodlight.openflow.protocol.OFMessage;
 import org.projectfloodlight.openflow.protocol.OFType;
 
+import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IOFMessageListener;
+import net.floodlightcontroller.core.IOFSwitch;
+
+
+
 /**
  *
  *
@@ -34,5 +40,5 @@ public interface IOFMessageListener extends IListener<OFType> {
    * information between listeners
    * @return the command to continue or stop the execution
    */
-  public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx);
+  public net.floodlightcontroller.core.IListener.Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx);
 }

@@ -105,6 +105,7 @@ public class StatsReplySerializer extends JsonSerializer<StatsReply> {
                 serializeQueueDescReply((List<OFQueueDescStatsReply>) reply.getValues(), jGen);
                 break;
             case FLOW:
+            	System.out.println("case Flow");
                 serializeFlowReply((List<OFFlowStatsReply>) reply.getValues(), jGen);
                 break;
             case FLOW_LIGHTWEIGHT:
@@ -956,6 +957,7 @@ public class StatsReplySerializer extends JsonSerializer<StatsReply> {
 
     public static void serializeFlowReply(List<OFFlowStatsReply> flowReplies, JsonGenerator jGen) throws IOException, JsonProcessingException{
         /* start the array before each reply */
+    	System.out.println("serializeFlowReply");
         jGen.writeFieldName("flows"); 
         jGen.writeStartArray();
         for (OFFlowStatsReply flowReply : flowReplies) { // for each flow stats reply

@@ -14,8 +14,12 @@ import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.ver13.OFMeterSerializerVer13;
 import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.MacAddress;
+import org.projectfloodlight.openflow.types.OFGroup;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.U64;
@@ -28,8 +32,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-public class StatisticsCollector implements IFloodlightModule, IStatisticsService {
-	private static final Logger log = LoggerFactory.getLogger(StatisticsCollector.class);
+public class StatisticsCollector2 implements IFloodlightModule {
+	private static final Logger log = LoggerFactory.getLogger(StatisticsCollector2.class);
 
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;
@@ -37,17 +41,12 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 
 	private static boolean isEnabled = false;
 	
-	private static int portStatsInterval = 10; /* could be set by REST API, so not final */
-	private static ScheduledFuture<?> portStatsCollector;
-
-	private static final long BITS_PER_BYTE = 8;
-	private static final long MILLIS_PER_SEC = 1000;
+	private static int statsInterval = 10; /* could be set by REST API, so not final */
+	private static ScheduledFuture<?> statsCollector;
 	
-	private static final String INTERVAL_PORT_STATS_STR = "collectionIntervalPortStatsSeconds";
+	private static final String INTERVAL_STATS_STR = "collectionIntervalStatsSeconds";
 	private static final String ENABLED_STR = "enable";
 
-	private static final HashMap<NodePortTuple, SwitchPortBandwidth> portStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
-	private static final HashMap<NodePortTuple, SwitchPortBandwidth> tentativePortStats = new HashMap<NodePortTuple, SwitchPortBandwidth>();
 
 	/**
 	 * Run periodically to collect all port statistics. This only collects
@@ -68,73 +67,46 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * @author Ryan Izard, ryan.izard@bigswitch.com, rizard@g.clemson.edu
 	 *
 	 */
-	private class PortStatsCollector implements Runnable {
+	private class FlowStatsCollector implements Runnable {
 
 		@Override
 		public void run() {
-			log.info("Run PortStatsCollector");
-			Map<DatapathId, List<OFStatsReply>> replies = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.PORT);
-			log.info("replies = " + replies.toString()) ;
-			for (Entry<DatapathId, List<OFStatsReply>> e : replies.entrySet()) {
-				log.info("e =" + e.toString());
-				for (OFStatsReply r : e.getValue()) {
-					log.info("r = " + r.toString());
-					OFPortStatsReply psr = (OFPortStatsReply) r;
-					log.info("psr = " + psr.toString());
-					for (OFPortStatsEntry pse : psr.getEntries()) {
-						log.info("pse = " + pse.toString());
-						NodePortTuple npt = new NodePortTuple(e.getKey(), pse.getPortNo());
-						log.info("key of e =" + e.getKey().toString() );
-						SwitchPortBandwidth spb;
-						log.info("portStats = " + portStats);
-						if (portStats.containsKey(npt) || tentativePortStats.containsKey(npt)) {
-							if (portStats.containsKey(npt)) { /* update */
-								spb = portStats.get(npt);
-							} else if (tentativePortStats.containsKey(npt)) { /* finish */
-								spb = tentativePortStats.get(npt);
-								tentativePortStats.remove(npt);
-							} else {
-								log.error("Inconsistent state between tentative and official port stats lists.");
-								return;
-							}
+			log.info("Run FlowStatsCollector");
+			
+			//All switches, all entries
+			Map<DatapathId, List<OFStatsReply>> replies_all = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.FLOW);
+			//log.info("replies_all = " + replies_all.toString()) ;
 
-							/* Get counted bytes over the elapsed period. Check for counter overflow. */
-							U64 rxBytesCounted;
-							U64 txBytesCounted;
-							if (spb.getPriorByteValueRx().compareTo(pse.getRxBytes()) > 0) { /* overflow */
-								U64 upper = U64.NO_MASK.subtract(spb.getPriorByteValueRx());
-								U64 lower = pse.getRxBytes();
-								rxBytesCounted = upper.add(lower);
-							} else {
-								rxBytesCounted = pse.getRxBytes().subtract(spb.getPriorByteValueRx());
-							}
-							if (spb.getPriorByteValueTx().compareTo(pse.getTxBytes()) > 0) { /* overflow */
-								U64 upper = U64.NO_MASK.subtract(spb.getPriorByteValueTx());
-								U64 lower = pse.getTxBytes();
-								txBytesCounted = upper.add(lower);
-							} else {
-								txBytesCounted = pse.getTxBytes().subtract(spb.getPriorByteValueTx());
-							}
-							IOFSwitch sw = switchService.getSwitch(npt.getNodeId());
-							long speed = 0;
-							if (sw != null) { /* could have disconnected; we'll assume zero-speed then */
-								speed = sw.getPort(npt.getPortId()).getCurrSpeed();
-							}
-							long timeDifSec = (System.currentTimeMillis() - spb.getUpdateTime()) / MILLIS_PER_SEC;
-							portStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), 
-									U64.ofRaw(speed),
-									U64.ofRaw((rxBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec), 
-									U64.ofRaw((txBytesCounted.getValue() * BITS_PER_BYTE) / timeDifSec), 
-									pse.getRxBytes(), pse.getTxBytes())
-									);
-							
-						} else { /* initialize */
-							tentativePortStats.put(npt, SwitchPortBandwidth.of(npt.getNodeId(), npt.getPortId(), U64.ZERO, U64.ZERO, U64.ZERO, pse.getRxBytes(), pse.getTxBytes()));
-							log.info("tentativePortStats = " + tentativePortStats);
+			//Per switch
+			for (Entry<DatapathId, List<OFStatsReply>> reply : replies_all.entrySet()) {
+				log.info("reply = " + reply);
+				
+				//Content of switch's answer
+				for (OFStatsReply r : reply.getValue()) { 
+					//log.info("r = " + r);
+					OFFlowStatsReply fsr = (OFFlowStatsReply) r;
+					
+					//Rules one by one
+					for (OFFlowStatsEntry rule : fsr.getEntries()) {
+						log.info("rule = " + rule);
+						String[] rule_fields = rule.toString().split(",");
+						String packetCount_str = rule_fields[8].split("x")[1];
+						Long packetCount = Long.parseLong(packetCount_str, 16);
+						if (packetCount > 10){
+							log.warn("DDoS !!");
 						}
+						//log.info(packetCount.toString());
+						 
+						OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
+						MacAddress srcDpid = rule.getMatch().get(MatchField.ETH_SRC);
+						MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
+						IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
+						IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
+						//log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid + " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
 					}
 				}
 			}
+
 		}
 	}
 
@@ -157,7 +129,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		}
 
 		public List<OFStatsReply> getStatisticsReply() {
-			log.info("getStatisticsReply");
+			//log.info("Reply from thread");
 			return statsReply;
 		}
 
@@ -167,7 +139,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 
 		@Override
 		public void run() {
-			log.info("Other run + statsReply");
+			//log.info("Thread run + statsReply");
 			statsReply = getSwitchStatistics(switchId, statType);
 		}
 	}
@@ -180,7 +152,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		Collection<Class<? extends IFloodlightService>> l =
 				new ArrayList<Class<? extends IFloodlightService>>();
-		l.add(IStatisticsService.class);
 		return l;
 	}
 
@@ -188,7 +159,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
 		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
 				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-		m.put(IStatisticsService.class, this);
 		return m;
 	}
 
@@ -219,14 +189,14 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		}
 		log.info("Statistics collection {}", isEnabled ? "enabled" : "disabled");
 
-		if (config.containsKey(INTERVAL_PORT_STATS_STR)) {
+		if (config.containsKey(INTERVAL_STATS_STR)) {
 			try {
-				portStatsInterval = Integer.parseInt(config.get(INTERVAL_PORT_STATS_STR).trim());
+				statsInterval = Integer.parseInt(config.get(INTERVAL_STATS_STR).trim());
 			} catch (Exception e) {
-				log.error("Could not parse '{}'. Using default of {}", INTERVAL_PORT_STATS_STR, portStatsInterval);
+				log.error("Could not parse '{}'. Using default of {}", INTERVAL_STATS_STR, statsInterval);
 			}
 		}
-		log.info("Port statistics collection interval set to {}s", portStatsInterval);
+		log.info("Port statistics collection interval set to {}s", statsInterval);
 	}
 
 	@Override
@@ -238,32 +208,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		}
 	}
 
-	/*
-	 * IStatisticsService implementation
-	 */
-	
-	@Override
-	public SwitchPortBandwidth getBandwidthConsumption(DatapathId dpid, OFPort p) {
-		return portStats.get(new NodePortTuple(dpid, p));
-	}
-	
-
-	@Override
-	public Map<NodePortTuple, SwitchPortBandwidth> getBandwidthConsumption() {
-		return Collections.unmodifiableMap(portStats);
-	}
-
-	@Override
-	public synchronized void collectStatistics(boolean collect) {
-		if (collect && !isEnabled) {
-			startStatisticsCollection();
-			isEnabled = true;
-		} else if (!collect && isEnabled) {
-			stopStatisticsCollection();
-			isEnabled = false;
-		} 
-		/* otherwise, state is not changing; no-op */
-	}
 	
 	/*
 	 * Helper functions
@@ -273,8 +217,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * Start all stats threads.
 	 */
 	private void startStatisticsCollection() {
-		portStatsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new PortStatsCollector(), portStatsInterval, portStatsInterval, TimeUnit.SECONDS);
-		tentativePortStats.clear(); /* must clear out, otherwise might have huge BW result if present and wait a long time before re-enabling stats */
+		statsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new FlowStatsCollector(), statsInterval, statsInterval, TimeUnit.SECONDS);
 		log.warn("Statistics collection thread(s) started");
 	}
 	
@@ -282,7 +225,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * Stop all stats threads.
 	 */
 	private void stopStatisticsCollection() {
-		if (!portStatsCollector.cancel(false)) {
+		if (!statsCollector.cancel(false)) {
 			log.error("Could not cancel port stats thread");
 		} else {
 			log.warn("Statistics collection thread(s) stopped");
@@ -295,8 +238,10 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * @param statsType
 	 * @return
 	 */
+	
+	// Statistics from all threads = switches
 	private Map<DatapathId, List<OFStatsReply>> getSwitchStatistics(Set<DatapathId> dpids, OFStatsType statsType) {
-		log.info("getSwitchStatistics long");
+		//log.info("getSwitchStatistics all thread");
 		HashMap<DatapathId, List<OFStatsReply>> model = new HashMap<DatapathId, List<OFStatsReply>>();
 
 		List<GetStatisticsThread> activeThreads = new ArrayList<GetStatisticsThread>(dpids.size());
@@ -313,7 +258,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 		 * finished the switch has not replied yet and therefore we won't
 		 * add the switch's stats to the reply.
 		 */
-		for (int iSleepCycles = 0; iSleepCycles < portStatsInterval; iSleepCycles++) {
+		for (int iSleepCycles = 0; iSleepCycles < statsInterval; iSleepCycles++) {
 			for (GetStatisticsThread curThread : activeThreads) {
 				if (curThread.getState() == State.TERMINATED) {
 					model.put(curThread.getSwitchId(), curThread.getStatisticsReply());
@@ -340,7 +285,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 				log.error("Interrupted while waiting for statistics", e);
 			}
 		}
-		log.info("model = " + model);
 		return model;
 	}
 
@@ -351,8 +295,8 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
+	//Get statistics from one thread = one switch
 	protected List<OFStatsReply> getSwitchStatistics(DatapathId switchId, OFStatsType statsType) {
-		log.info("getSwitchStatistics short");
 		IOFSwitch sw = switchService.getSwitch(switchId);
 		ListenableFuture<?> future;
 		List<OFStatsReply> values = null;
@@ -366,6 +310,7 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 						.setMatch(match)
 						.setOutPort(OFPort.ANY)
 						.setTableId(TableId.ALL)
+						.setOutGroup(OFGroup.ANY)
 						.build();
 				break;
 			case AGGREGATE:
@@ -377,7 +322,6 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 						.build();
 				break;
 			case PORT:
-				log.info("This case !");
 				req = sw.getOFFactory().buildPortStatsRequest()
 				.setPortNo(OFPort.ANY)
 				.build();
@@ -463,14 +407,12 @@ public class StatisticsCollector implements IFloodlightModule, IStatisticsServic
 			try {
 				if (req != null) {
 					future = sw.writeStatsRequest(req); 
-					log.info("future = " + future);
-					values = (List<OFStatsReply>) future.get(portStatsInterval / 2, TimeUnit.SECONDS);
+					values = (List<OFStatsReply>) future.get(statsInterval / 2, TimeUnit.SECONDS);
 				}
 			} catch (Exception e) {
 				log.error("Failure retrieving statistics from switch {}. {}", sw, e);
 			}
 		}
-		log.info(values.toString());
 		return values;
 	}
 }
