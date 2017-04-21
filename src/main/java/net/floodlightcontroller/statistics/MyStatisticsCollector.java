@@ -12,6 +12,9 @@ import net.floodlightcontroller.core.types.NodePortTuple;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
+import net.floodlightcontroller.flowcreator.FlowCreator;
+import net.floodlightcontroller.flowcreator.IFlowCreatorService;
+
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
@@ -38,6 +41,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;
 	private static IRestApiService restApiService;
+	private static IFlowCreatorService flowCreatorService;
 
 	private static boolean isEnabled = false;
 	
@@ -81,6 +85,10 @@ public class MyStatisticsCollector implements IFloodlightModule {
 			for (Entry<DatapathId, List<OFStatsReply>> reply : replies_all.entrySet()) {
 				log.info("reply = " + reply);
 				
+				IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
+				//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
+				flowCreatorService.writeFlowMod(sw);
+				
 				//Content of switch's answer
 				for (OFStatsReply r : reply.getValue()) { 
 					//log.info("r = " + r);
@@ -92,9 +100,9 @@ public class MyStatisticsCollector implements IFloodlightModule {
 						String[] rule_fields = rule.toString().split(",");
 						String packetCount_str = rule_fields[8].split("x")[1];
 						Long packetCount = Long.parseLong(packetCount_str, 16);
-						if (packetCount > 10){
+						/*if (packetCount > 10){
 							log.warn("DDoS !!");
-						}
+						}*/
 						//log.info(packetCount.toString());
 						 
 						OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
@@ -150,16 +158,12 @@ public class MyStatisticsCollector implements IFloodlightModule {
 	
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		Collection<Class<? extends IFloodlightService>> l =
-				new ArrayList<Class<? extends IFloodlightService>>();
-		return l;
+		return null;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
-		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
-				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-		return m;
+		return null;
 	}
 
 	@Override
@@ -169,6 +173,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		l.add(IOFSwitchService.class);
 		l.add(IThreadPoolService.class);
 		l.add(IRestApiService.class);
+		l.add(IFlowCreatorService.class);
 		return l;
 	}
 
@@ -178,6 +183,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		restApiService = context.getServiceImpl(IRestApiService.class);
+		flowCreatorService = context.getServiceImpl(IFlowCreatorService.class);
 
 		Map<String, String> config = context.getConfigParams(this);
 		if (config.containsKey(ENABLED_STR)) {

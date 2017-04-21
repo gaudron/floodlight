@@ -17,6 +17,7 @@ import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.util.MatchUtils;
 import net.floodlightcontroller.flowcreator.FlowCreator;
+import net.floodlightcontroller.flowcreator.IFlowCreatorService;
 
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
@@ -53,6 +54,7 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;
 	private static IRestApiService restApiService;
+	//private static IFlowCreatorService flowCreatorService;
 
 	private static boolean isEnabled = false;
 	
@@ -135,56 +137,8 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 				log.warn("*** FlowMonitor: An error occurred while polling switch: " + e);
 			}
 			
-			net.floodlightcontroller.flowcreator.FlowCreator.writeFlowMod(sw1);
+			//flowCreatorService.writeFlowMod(sw1);
 		}
-		
-		//private void writeFlowMod(IOFSwitch sw) {
-			//OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
-			/*OFMessageFactory ofMessageFactory;
-			OFFlowMod flowMod = floodlightProvider.getOFMessageFactory().getMessage(OFType.FLOW_MOD);
-			Match match;
-			match = MatchUtils.fromString("eth_type=0x800,ipv4_dst=10.0.0.2", factory.getVersion());
-			List<OFAction> actions = new LinkedList<OFAction>();
-			actions.add(factory.actions().output(OFPort.CONTROLLER, Integer.MAX_VALUE));
-
-			flowMod = flowMod.createBuilder().setMatch(match)
-					.setActions(actions)
-					.setFlags(Collections.singleton(OFFlowModFlags.SEND_FLOW_REM))
-					.setBufferId(OFBufferId.NO_BUFFER)
-					.setOutPort(OFPort.ANY)
-					.setPriority(Integer.MAX_VALUE)
-					.setXid(10)
-					.build();*/
-			
-			/*Match myMatch = factory.buildMatch()
-				    .setExact(MatchField.IN_PORT, OFPort.of(1))
-				    .setExact(MatchField.ETH_TYPE, EthType.IPv4)
-				    .setExact(MatchField.IPV4_SRC, IPv4Address.of("10.0.0.1"))
-				    .setExact(MatchField.IP_PROTO, IpProtocol.TCP)
-				    .setExact(MatchField.TCP_DST, TransportPort.of(80))
-				    .build();
-			
-			
-			OFFlowAdd flowAdd = factory.buildFlowAdd()
-				    .setBufferId(OFBufferId.NO_BUFFER)
-				    .setHardTimeout(3600)
-				    .setIdleTimeout(10)
-				    .setPriority(32768)
-				    .setMatch(myMatch)
-				    .setTableId(TableId.of(1))
-				    .build();
-			
-			sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-			if (sw != null) {
-				log.info("Writing to switch");
-				sw.write(flowAdd);
-			}
-			else {
-				log.warn("No switch !");
-			}
-			
-			//writeOFMessageToSwitch(DatapathId.of("00:00:00:00:00:00:00:01"), flowMod);
-		}*/
 	}
 
 
@@ -194,16 +148,12 @@ public class StatisticsFlowCollector implements IFloodlightModule {
 	
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
-		Collection<Class<? extends IFloodlightService>> l =
-				new ArrayList<Class<? extends IFloodlightService>>();
-		return l;
+		return null;
 	}
 
 	@Override
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
-		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
-				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-		return m;
+		return null;
 	}
 
 	@Override
