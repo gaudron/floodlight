@@ -86,17 +86,19 @@ public class FlowCreator implements IFloodlightModule, IFlowCreatorService {
 	}
 	
 	@Override
-	public void writeFlowMod(IOFSwitch sw) {
+	public void writeFlowModDDoS(IOFSwitch sw, int port_src, String MAC_src, String MAC_dst, String IP_src, String IP_dst) {
 		OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
 		
 		//Match
 		Match myMatch = factory.buildMatch()
-			    .setExact(MatchField.IN_PORT, OFPort.of(1))
-			    .setExact(MatchField.ETH_TYPE, EthType.IPv4)
-			    .setExact(MatchField.IPV4_SRC, IPv4Address.of("10.0.0.1"))
-			    .setExact(MatchField.IPV4_DST, IPv4Address.of("10.0.0.2"))
-			    //.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
-			    //.setExact(MatchField.TCP_DST, TransportPort.of(80))
+			    .setExact(MatchField.IN_PORT, OFPort.of(port_src))
+			    .setExact(MatchField.ETH_TYPE, EthType.IPv4) // Needed when specifying IPv4 address
+			    .setExact(MatchField.ETH_SRC, MacAddress.of(MAC_src))
+			    .setExact(MatchField.ETH_DST, MacAddress.of(MAC_dst))
+			    .setExact(MatchField.IPV4_SRC, IPv4Address.of(IP_src))
+			    .setExact(MatchField.IPV4_DST, IPv4Address.of(IP_dst))
+			    .setExact(MatchField.IP_PROTO, IpProtocol.TCP)
+			    .setExact(MatchField.TCP_DST, TransportPort.of(80))
 			    .build();
 		
 		//Action

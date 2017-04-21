@@ -85,9 +85,6 @@ public class MyStatisticsCollector implements IFloodlightModule {
 			for (Entry<DatapathId, List<OFStatsReply>> reply : replies_all.entrySet()) {
 				log.info("reply = " + reply);
 				
-				IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
-				//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-				flowCreatorService.writeFlowMod(sw);
 				
 				//Content of switch's answer
 				for (OFStatsReply r : reply.getValue()) { 
@@ -100,17 +97,27 @@ public class MyStatisticsCollector implements IFloodlightModule {
 						String[] rule_fields = rule.toString().split(",");
 						String packetCount_str = rule_fields[8].split("x")[1];
 						Long packetCount = Long.parseLong(packetCount_str, 16);
-						/*if (packetCount > 10){
-							log.warn("DDoS !!");
-						}*/
-						//log.info(packetCount.toString());
-						 
-						OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
-						MacAddress srcDpid = rule.getMatch().get(MatchField.ETH_SRC);
-						MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
-						IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
-						IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
-						//log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid + " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
+						
+						if (packetCount > 25){
+														
+							OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
+							MacAddress srcDpid = rule.getMatch().get(MatchField.ETH_SRC);
+							MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
+							IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
+							IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
+							log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid 
+							+ " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
+
+							
+							IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
+							//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
+							if(ipSrc != null){
+								log.warn("DDoS !!");
+								flowCreatorService.writeFlowModDDoS(sw, Integer.parseInt(srcPort.toString()), srcDpid.toString(), 
+										dstDpid.toString(), ipSrc.toString(), ipDst.toString());
+							}
+						}
+						//log.info(packetCount.toString());						
 					}
 				}
 			}
