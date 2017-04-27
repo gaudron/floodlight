@@ -32,3 +32,4 @@ net.floodlightcontroller.cpanalyzer.CPAnalyzer
 net.floodlightcontroller.mactracker.MACTracker
 net.floodlightcontroller.pktinhistory.PktInHistory
 net.floodlightcontroller.bandwidthcollector.BandwidthCollector
+net.floodlightcontroller.contextactivator.ContextActivator
