@@ -1,4 +1,4 @@
-package net.floodlightcontroller.flowcreator;
+package net.floodlightcontroller.flowhandler;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.projectfloodlight.openflow.protocol.OFFactories;
 import org.projectfloodlight.openflow.protocol.OFFactory;
@@ -44,7 +45,7 @@ import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.util.MatchUtils;
 import net.floodlightcontroller.staticentry.*;
 
-public class FlowCreator implements IFloodlightModule, IFlowCreatorService {
+public class FlowHandler implements IFloodlightModule, IFlowHandlerService {
 
 	protected static Logger log;
 	private static IOFSwitchService switchService;
@@ -53,7 +54,7 @@ public class FlowCreator implements IFloodlightModule, IFlowCreatorService {
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		Collection<Class<? extends IFloodlightService>> l =
 				new ArrayList<Class<? extends IFloodlightService>>();
-		l.add(IFlowCreatorService.class);
+		l.add(IFlowHandlerService.class);
 		return l;
 	}
 
@@ -61,7 +62,7 @@ public class FlowCreator implements IFloodlightModule, IFlowCreatorService {
 	public Map<Class<? extends IFloodlightService>, IFloodlightService> getServiceImpls() {
 		Map<Class<? extends IFloodlightService>, IFloodlightService> m =
 				new HashMap<Class<? extends IFloodlightService>, IFloodlightService>();
-		m.put(IFlowCreatorService.class, this);
+		m.put(IFlowHandlerService.class, this);
 		return m;
 	}
 
@@ -75,81 +76,111 @@ public class FlowCreator implements IFloodlightModule, IFlowCreatorService {
 
 	@Override
 	public void init(FloodlightModuleContext context) throws FloodlightModuleException {
-		log = LoggerFactory.getLogger(FlowCreator.class);
+		log = LoggerFactory.getLogger(FlowHandler.class);
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 
 	}
 
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
-		
+
 	}
 	
 	@Override
-	public void writeFlowModDDoS(IOFSwitch sw, int port_src, String MAC_src, String MAC_dst, String IP_src, String IP_dst) {
+	public void writeFlowModCleaner(IOFSwitch sw, String MAC_src){
 		OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
-		
-		//Match
 		Match myMatch = factory.buildMatch()
-			    .setExact(MatchField.IN_PORT, OFPort.of(port_src))
-			    .setExact(MatchField.ETH_TYPE, EthType.IPv4) // Needed when specifying IPv4 address
-			    .setExact(MatchField.ETH_SRC, MacAddress.of(MAC_src))
-			    .setExact(MatchField.ETH_DST, MacAddress.of(MAC_dst))
-			    .setExact(MatchField.IPV4_SRC, IPv4Address.of(IP_src))
-			    .setExact(MatchField.IPV4_DST, IPv4Address.of(IP_dst))
-			    .setExact(MatchField.IP_PROTO, IpProtocol.TCP)
-			    .setExact(MatchField.TCP_DST, TransportPort.of(80))
-			    .build();
+				.setExact(MatchField.ETH_TYPE, EthType.IPv4) // Needed when specifying IPv4 address
+				.setExact(MatchField.ETH_SRC, MacAddress.of(MAC_src)).build();
 		
-		//Action
-		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
-		OFActions actions = factory.actions();
-		OFOxms oxms = factory.oxms();
-		
-		/* Use OXM to modify header fields. */
-		OFActionSetField setEthDst = actions.buildSetField()
-		    .setField(
-		        oxms.buildEthDst()
-		        .setValue(MacAddress.of("00:00:00:00:00:05"))
-		        .build()
-		    )
-		    .build();
-		actionList.add(setEthDst);
-		
-		OFActionSetField setIPDst = actions.buildSetField()
-			    .setField(
-			        oxms.buildIpv4Dst()
-			        .setValue(IPv4Address.of("10.0.0.5"))
-			        .build()
-			    )
-			    .build();
-		actionList.add(setIPDst);
-		
-		/* Output to a port is also an OFAction, not an OXM. */
-		OFActionOutput output_port = actions.buildOutput()
-		    .setPort(OFPort.of(5))
-		    .build();
-		actionList.add(output_port);
-		
-		
+
 		//Flow
 		OFFlowAdd flowAdd = factory.buildFlowAdd()
-			    .setBufferId(OFBufferId.NO_BUFFER)
-			    .setHardTimeout(3600)
-			    .setIdleTimeout(10)
-			    .setPriority(32768)
-			    .setMatch(myMatch)
-			    .setActions(actionList)
-			    .setTableId(TableId.of(0))
-			    .build();
+				.setBufferId(OFBufferId.NO_BUFFER)
+				.setHardTimeout(3600)
+				.setIdleTimeout(15)
+				.setPriority(32768)
+				.setMatch(myMatch)
+				.setTableId(TableId.of(0))
+				.build();
 		
 		if (sw != null) {
-			log.info("Writing to switch");
+			log.info("Writing cleaner rule to switch");
 			sw.write(flowAdd);
 		}
 		else {
 			log.warn("No switch connected !");
-		}		
+		}
+		
+	}
+
+	@Override
+	public void writeFlowModDDoS(IOFSwitch sw, int port_src, String MAC_src, String MAC_dst, String IP_src, String IP_dst, String MAC_cleaner) {
+		OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
+
+		if(MAC_cleaner != "10.0.0.5"){
+			//Match
+			Match myMatch = factory.buildMatch()
+					.setExact(MatchField.IN_PORT, OFPort.of(port_src))
+					.setExact(MatchField.ETH_TYPE, EthType.IPv4) // Needed when specifying IPv4 address
+					.setExact(MatchField.ETH_SRC, MacAddress.of(MAC_src))
+					.setExact(MatchField.ETH_DST, MacAddress.of(MAC_dst))
+					.setExact(MatchField.IPV4_SRC, IPv4Address.of(IP_src))
+					.setExact(MatchField.IPV4_DST, IPv4Address.of(IP_dst))
+					//.setExact(MatchField.IP_PROTO, IpProtocol.TCP)
+					//.setExact(MatchField.TCP_DST, TransportPort.of(80))
+					.build();
+
+			//Action
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			OFActions actions = factory.actions();
+			OFOxms oxms = factory.oxms();
+
+			/* Use OXM to modify header fields. */
+			OFActionSetField setEthDst = actions.buildSetField()
+					.setField(
+							oxms.buildEthDst()
+							.setValue(MacAddress.of(MAC_cleaner))
+							.build()
+							)
+					.build();
+			actionList.add(setEthDst);
+
+			OFActionSetField setIPDst = actions.buildSetField()
+					.setField(
+							oxms.buildIpv4Dst()
+							.setValue(IPv4Address.of("10.0.0.5"))
+							.build()
+							)
+					.build();
+			actionList.add(setIPDst);
+
+			/* Output to a port is also an OFAction, not an OXM. */
+			OFActionOutput output_port = actions.buildOutput()
+					.setPort(OFPort.of(5))
+					.build();
+			actionList.add(output_port);
+
+
+			//Flow
+			OFFlowAdd flowAdd = factory.buildFlowAdd()
+					.setBufferId(OFBufferId.NO_BUFFER)
+					.setHardTimeout(3600)
+					.setIdleTimeout(15)
+					.setPriority(32768)
+					.setMatch(myMatch)
+					.setActions(actionList)
+					.setTableId(TableId.of(0))
+					.build();
+
+			if (sw != null) {
+				log.info("Writing to switch");
+				sw.write(flowAdd);
+			}
+			else {
+				log.warn("No switch connected !");
+			}	
+		}
 	}	
 }
-	
+

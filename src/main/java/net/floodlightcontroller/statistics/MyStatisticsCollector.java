@@ -9,11 +9,11 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.types.NodePortTuple;
+import net.floodlightcontroller.flowhandler.FlowHandler;
+import net.floodlightcontroller.flowhandler.IFlowHandlerService;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
-import net.floodlightcontroller.flowcreator.FlowCreator;
-import net.floodlightcontroller.flowcreator.IFlowCreatorService;
 
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.match.Match;
@@ -41,15 +41,17 @@ public class MyStatisticsCollector implements IFloodlightModule {
 	private static IOFSwitchService switchService;
 	private static IThreadPoolService threadPoolService;
 	private static IRestApiService restApiService;
-	private static IFlowCreatorService flowCreatorService;
+	private static IFlowHandlerService flowCreatorService;
 
 	private static boolean isEnabled = false;
-	
+
 	private static int statsInterval = 10; /* could be set by REST API, so not final */
 	private static ScheduledFuture<?> statsCollector;
-	
+
 	private static final String INTERVAL_STATS_STR = "collectionIntervalStatsSeconds";
 	private static final String ENABLED_STR = "enable";
+	
+	private static Map<ArrayList<String>, Long> rule_list;
 
 
 	/**
@@ -84,13 +86,13 @@ public class MyStatisticsCollector implements IFloodlightModule {
 			//Per switch
 			for (Entry<DatapathId, List<OFStatsReply>> reply : replies_all.entrySet()) {
 				log.info("reply = " + reply);
-				
-				
+
+
 				//Content of switch's answer
 				for (OFStatsReply r : reply.getValue()) { 
 					//log.info("r = " + r);
 					OFFlowStatsReply fsr = (OFFlowStatsReply) r;
-					
+
 					//Rules one by one
 					for (OFFlowStatsEntry rule : fsr.getEntries()) {
 						log.info("rule = " + rule);
@@ -98,29 +100,46 @@ public class MyStatisticsCollector implements IFloodlightModule {
 						String packetCount_str = rule_fields[8].split("x")[1];
 						Long packetCount = Long.parseLong(packetCount_str, 16);
 						
-						if (packetCount > 25){
-														
-							OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
-							MacAddress srcDpid = rule.getMatch().get(MatchField.ETH_SRC);
-							MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
-							IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
-							IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
-							log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid 
-							+ " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
+						log.info(packetCount.toString());	
 
+
+						OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
+						MacAddress srcDpid = rule.getMatch().get(MatchField.ETH_SRC);
+						MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
+						IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
+						IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
+						log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid 
+						+ " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
+						
+						ArrayList<String> map_key = new ArrayList();
+						if(srcPort != null && srcDpid != null && dstDpid != null
+								&& ipSrc != null && ipDst !=null){
+							map_key.add(srcPort.toString());
+							map_key.add(srcDpid.toString());
+							map_key.add(dstDpid.toString());
+							map_key.add(ipSrc.toString());
+							map_key.add(ipDst.toString());
 							
-							IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
-							//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-							if(ipSrc != null){
-								log.warn("DDoS !!");
-								flowCreatorService.writeFlowModDDoS(sw, Integer.parseInt(srcPort.toString()), srcDpid.toString(), 
-										dstDpid.toString(), ipSrc.toString(), ipDst.toString());
-							}
+							rule_list.put(map_key, packetCount);
 						}
-						//log.info(packetCount.toString());						
+										
+						
+
+						IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
+						//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
+						if(packetCount > 10 && ipSrc != null){ // For cleaner rule, ipSrc is null (because not precised)
+							log.warn("DDoS !!");
+							flowCreatorService.writeFlowModCleaner(sw, "00:00:00:00:00:05");
+							flowCreatorService.writeFlowModDDoS(sw, Integer.parseInt(srcPort.toString()), srcDpid.toString(), 
+									dstDpid.toString(), ipSrc.toString(), ipDst.toString(), "00:00:00:00:00:05");
+						}
+
+											
 					}
 				}
 			}
+			
+			log.info(rule_list.keySet().toString());
 
 		}
 	}
@@ -158,11 +177,11 @@ public class MyStatisticsCollector implements IFloodlightModule {
 			statsReply = getSwitchStatistics(switchId, statType);
 		}
 	}
-	
+
 	/*
 	 * IFloodlightModule implementation
 	 */
-	
+
 	@Override
 	public Collection<Class<? extends IFloodlightService>> getModuleServices() {
 		return null;
@@ -180,7 +199,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		l.add(IOFSwitchService.class);
 		l.add(IThreadPoolService.class);
 		l.add(IRestApiService.class);
-		l.add(IFlowCreatorService.class);
+		l.add(IFlowHandlerService.class);
 		return l;
 	}
 
@@ -190,7 +209,9 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		switchService = context.getServiceImpl(IOFSwitchService.class);
 		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		restApiService = context.getServiceImpl(IRestApiService.class);
-		flowCreatorService = context.getServiceImpl(IFlowCreatorService.class);
+		flowCreatorService = context.getServiceImpl(IFlowHandlerService.class);
+		
+		rule_list = new HashMap<ArrayList<String>, Long>();
 
 		Map<String, String> config = context.getConfigParams(this);
 		if (config.containsKey(ENABLED_STR)) {
@@ -221,11 +242,11 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		}
 	}
 
-	
+
 	/*
 	 * Helper functions
 	 */
-	
+
 	/**
 	 * Start all stats threads.
 	 */
@@ -233,7 +254,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		statsCollector = threadPoolService.getScheduledExecutor().scheduleAtFixedRate(new FlowStatsCollector(), statsInterval, statsInterval, TimeUnit.SECONDS);
 		log.warn("Statistics collection thread(s) started");
 	}
-	
+
 	/**
 	 * Stop all stats threads.
 	 */
@@ -251,7 +272,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 	 * @param statsType
 	 * @return
 	 */
-	
+
 	// Statistics from all threads = switches
 	private Map<DatapathId, List<OFStatsReply>> getSwitchStatistics(Set<DatapathId> dpids, OFStatsType statsType) {
 		//log.info("getSwitchStatistics all thread");
@@ -283,7 +304,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 			for (GetStatisticsThread curThread : pendingRemovalThreads) {
 				activeThreads.remove(curThread);
 			}
-			
+
 			/* clear the list so we don't try to double remove them */
 			pendingRemovalThreads.clear();
 

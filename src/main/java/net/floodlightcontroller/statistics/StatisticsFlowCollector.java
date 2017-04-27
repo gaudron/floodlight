@@ -11,13 +11,13 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.types.NodePortTuple;
+import net.floodlightcontroller.flowhandler.FlowHandler;
+import net.floodlightcontroller.flowhandler.IFlowHandlerService;
 import net.floodlightcontroller.core.IOFMessageListener;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.statistics.web.SwitchStatisticsWebRoutable;
 import net.floodlightcontroller.threadpool.IThreadPoolService;
 import net.floodlightcontroller.util.MatchUtils;
-import net.floodlightcontroller.flowcreator.FlowCreator;
-import net.floodlightcontroller.flowcreator.IFlowCreatorService;
 
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
