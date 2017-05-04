@@ -8,5 +8,5 @@ public interface IBandwidthAlertListener {
 	 * Deals with bandwidth alerts
 	 */
 	
-	public void receiveBandwidthNotification(String type, NodePortTuple dpid_port);
+	public void receiveBandwidthNotification(String type, long value, NodePortTuple dpid_port);
 }

@@ -11,6 +11,6 @@ public interface IBandwidthAlertService extends IFloodlightService {
 	
 	public void addBandwidthAlertListener(IBandwidthAlertListener listener);
 
-	public void notifyListeners(String type, NodePortTuple dpid_port);
+	public void notifyListeners(String type, long value, NodePortTuple dpid_port);
 
 }

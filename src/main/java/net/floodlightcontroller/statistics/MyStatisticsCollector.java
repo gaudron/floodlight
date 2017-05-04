@@ -50,9 +50,8 @@ public class MyStatisticsCollector implements IFloodlightModule {
 
 	private static final String INTERVAL_STATS_STR = "collectionIntervalStatsSeconds";
 	private static final String ENABLED_STR = "enable";
-	
-	private static Map<ArrayList<String>, Long> rule_list;
 
+	private static Map<ArrayList<String>, Long> rule_list;
 
 	/**
 	 * Run periodically to collect all port statistics. This only collects
@@ -78,7 +77,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		@Override
 		public void run() {
 			log.info("Run FlowStatsCollector");
-			
+
 			//All switches, all entries
 			Map<DatapathId, List<OFStatsReply>> replies_all = getSwitchStatistics(switchService.getAllSwitchDpids(), OFStatsType.FLOW);
 			//log.info("replies_all = " + replies_all.toString()) ;
@@ -99,8 +98,6 @@ public class MyStatisticsCollector implements IFloodlightModule {
 						String[] rule_fields = rule.toString().split(",");
 						String packetCount_str = rule_fields[8].split("x")[1];
 						Long packetCount = Long.parseLong(packetCount_str, 16);
-						
-						log.info(packetCount.toString());	
 
 
 						OFPort srcPort = rule.getMatch().get(MatchField.IN_PORT);						
@@ -108,9 +105,10 @@ public class MyStatisticsCollector implements IFloodlightModule {
 						MacAddress dstDpid = rule.getMatch().get(MatchField.ETH_DST);		
 						IPv4Address ipSrc = rule.getMatch().get(MatchField.IPV4_SRC);
 						IPv4Address ipDst = rule.getMatch().get(MatchField.IPV4_DST);
-						log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid 
-						+ " dstDpid = " + dstDpid + " ipSrc = " + ipSrc + " ipDst = " + ipDst );
+						log.info("srcPort = " + srcPort + " srcDpid = " + srcDpid + " dstDpid = " + dstDpid + " ipSrc = " + ipSrc 
+								+ " ipDst = " + ipDst + " packetCount = " + packetCount.toString());
 						
+
 						ArrayList<String> map_key = new ArrayList();
 						if(srcPort != null && srcDpid != null && dstDpid != null
 								&& ipSrc != null && ipDst !=null){
@@ -119,26 +117,33 @@ public class MyStatisticsCollector implements IFloodlightModule {
 							map_key.add(dstDpid.toString());
 							map_key.add(ipSrc.toString());
 							map_key.add(ipDst.toString());
-							
+
 							rule_list.put(map_key, packetCount);
 						}
-										
-						
+
+
 
 						IOFSwitch sw = switchService.getSwitch(DatapathId.of((reply.getKey()).toString()));
 						//IOFSwitch sw = switchService.getSwitch(DatapathId.of("00:00:00:00:00:00:00:01"));
-						if(packetCount > 10 && ipSrc != null){ // For cleaner rule, ipSrc is null (because not precised)
+						if(packetCount > 20 && ipSrc != null){ // For cleaner rule, ipSrc is null (because not precised)
 							log.warn("DDoS !!");
 							flowCreatorService.writeFlowModCleaner(sw, "00:00:00:00:00:05");
-							flowCreatorService.writeFlowModDDoS(sw, Integer.parseInt(srcPort.toString()), srcDpid.toString(), 
-									dstDpid.toString(), ipSrc.toString(), ipDst.toString(), "00:00:00:00:00:05");
+							flowCreatorService.writeNewFlowModCleaner(sw, ipDst.toString(), "00:00:00:00:00:05");
+
+						}
+						
+						if(rule.getCookie().equals(U64.of(0x01))){
+							log.info("Cookie match");
+							flowCreatorService.deleteFlow(rule, U64.of(0x01), sw);
+						} else {
+							log.info("No match found for cookie " + rule.getCookie());
 						}
 
-											
+
 					}
 				}
 			}
-			
+
 			log.info(rule_list.keySet().toString());
 
 		}
@@ -210,7 +215,7 @@ public class MyStatisticsCollector implements IFloodlightModule {
 		threadPoolService = context.getServiceImpl(IThreadPoolService.class);
 		restApiService = context.getServiceImpl(IRestApiService.class);
 		flowCreatorService = context.getServiceImpl(IFlowHandlerService.class);
-		
+
 		rule_list = new HashMap<ArrayList<String>, Long>();
 
 		Map<String, String> config = context.getConfigParams(this);

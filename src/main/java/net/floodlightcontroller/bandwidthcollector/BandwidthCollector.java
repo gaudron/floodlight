@@ -77,18 +77,22 @@ public class BandwidthCollector implements IFloodlightModule, IBandwidthAlertSer
 
 	private class ThreadBandwidthCollector implements Runnable {
 
+		//java.text.DecimalFormat df= new java.text.DecimalFormat("0.##");
+		long max_bandwidth = 10000000; //obtained with statsResult.get(keys).getLinkSpeedBitsPerSec().getValue()
 		@Override
 		public void run() {
 			statsResult = statsProvider.getBandwidthConsumption();
 			for (NodePortTuple keys : statsResult.keySet()) {
 				long RxRate = statsResult.get(keys).getBitsPerSecondRx().getValue();
 				long TxRate = statsResult.get(keys).getBitsPerSecondTx().getValue();
+				long bandwidth_percent = TxRate/max_bandwidth;
 				log.info("Port number:" + keys.getPortId().getPortNumber());
 				log.info("Received: " +  RxRate +" bits/s");
 				log.info("Transmitted: " + TxRate +" bits/s");
+				log.info("Bandwidth percentage in reception: " + bandwidth_percent + "%");
 				
-				if(TxRate > 2000){
-					notifyListeners("overload",  keys);
+				if(bandwidth_percent > 0.1){
+					notifyListeners("stat:bandwidth", bandwidth_percent,  keys);
 				}
 			}
 
@@ -104,9 +108,9 @@ public class BandwidthCollector implements IFloodlightModule, IBandwidthAlertSer
 	}
 
 	@Override
-	public void notifyListeners(String type, NodePortTuple dpid_port) {
-		for (IBandwidthAlertListener list : listeners) {   //ContextActivator is a listener
-			list.receiveBandwidthNotification(type, dpid_port);
+	public void notifyListeners(String type, long value, NodePortTuple dpid_port) {
+		for (IBandwidthAlertListener list : listeners) {   //ContextHandler is a listener
+			list.receiveBandwidthNotification(type, value, dpid_port);
 		}
 	}
 }
