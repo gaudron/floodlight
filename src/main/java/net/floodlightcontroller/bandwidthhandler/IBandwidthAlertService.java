@@ -1,4 +1,4 @@
-package net.floodlightcontroller.bandwidthcollector;
+package net.floodlightcontroller.bandwidthhandler;
 
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.core.types.NodePortTuple;
@@ -11,6 +11,6 @@ public interface IBandwidthAlertService extends IFloodlightService {
 	
 	public void addBandwidthAlertListener(IBandwidthAlertListener listener);
 
-	public void notifyListeners(String type, long value, NodePortTuple dpid_port);
+	public void notifyListeners(String type, float value, NodePortTuple dpid_port);
 
 }

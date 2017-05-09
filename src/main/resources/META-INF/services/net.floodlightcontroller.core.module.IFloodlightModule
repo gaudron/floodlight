@@ -26,8 +26,9 @@ net.floodlightcontroller.firewall.Firewall
 net.floodlightcontroller.accesscontrollist.ACL
 net.floodlightcontroller.dhcpserver.DHCPServer
 net.floodlightcontroller.learningswitch.LearningSwitch
-net.floodlightcontroller.statistics.MyStatisticsCollector
+net.floodlightcontroller.statistics.StatisticsCollector
 net.floodlightcontroller.routing.RoutingManager
 net.floodlightcontroller.cpanalyzer.CPAnalyzer
-net.floodlightcontroller.flowhandler.FlowHandler
+net.floodlightcontroller.bandwidthhandler.BandwidthHandler
+net.floodlightcontroller.contexthandler.ContextHandler
 

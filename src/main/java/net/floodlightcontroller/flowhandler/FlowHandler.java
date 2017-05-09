@@ -300,11 +300,30 @@ public class FlowHandler implements IFloodlightModule, IFlowHandlerService {
 		
 		if(rule.getCookie().equals(cookie)){
 			
-			OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
+			OFVersion version = rule.getVersion();
+			log.info("Version: " + version);
+			OFFlowDelete.Builder b = OFFactories.getFactory(version).buildFlowDelete();
+			
+			OFFlowDelete flowDel = b.setCookie(rule.getCookie())
+									.setFlags(rule.getFlags())
+									.setHardTimeout(rule.getHardTimeout())
+									.setIdleTimeout(rule.getIdleTimeout())
+									.setInstructions(rule.getInstructions())
+									.setMatch(rule.getMatch())
+									.setPriority(rule.getPriority())
+									.setTableId(rule.getTableId())
+									.build();
+						
+			
+			//OFFactory factory = OFFactories.getFactory(OFVersion.OF_13);
+			
+			//OFFlowDelete flowDelete = FlowModUtils.toFlowDelete((OFFlowMod) rule);
+			
+			//OFFlowMod test = (OFFlowMod) rule;
 
 			//Match
-			Match myMatch = rule.getMatch();
-			log.info("myMatch : " + myMatch);
+			//Match myMatch = rule.getMatch();
+			//log.info("myMatch : " + myMatch);
 			/*Match myMatch = factory.buildMatch()
 					.setExact(MatchField.ETH_TYPE, EthType.IPv4) // Needed when specifying IPv4 address
 					.setExact(MatchField.IPV4_DST, IPv4Address.of("10.0.0.2"))
@@ -312,11 +331,11 @@ public class FlowHandler implements IFloodlightModule, IFlowHandlerService {
 					//.setExact(MatchField.TCP_DST, TransportPort.of(80))
 					.build();*/
 			
-			OFFlowDelete flowDel = factory.buildFlowDelete()
+			/*OFFlowDelete flowDel = factory.buildFlowDelete()
 					.setMatch(myMatch)
 					.setTableId(TableId.of(0))
 					.setPriority(32767)
-					.build();
+					.build();*/
 			
 			//OFFlowDelete flowDelete = FlowModUtils.toFlowDelete((OFFlowMod) rule);
 			

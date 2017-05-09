@@ -2,16 +2,20 @@
 	"contexts": [
 		{
 			"name": "DDoS",
-			"conditions": {
+			"conditions_1": {
 				"alert": "DDoS",
-				"stat:bandwidth": "0.3"
+				"stat:bandwidth": "0.4"
+			},
+			"conditions_2": {
+				"stat:bandwidth": "0.4"
 			},
 			"target": "all"
 		},
 		{
 			"name": "Malware",
-			"conditions": {
-				"alert": "Malware"
+			"conditions_1": {
+				"alert": "Malware",
+				"stat:bandwidth": "0.3"
 			},
 			"target": "all"
 		}
